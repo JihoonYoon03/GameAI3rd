@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="FSMGame/FSMGame.vcxproj" Id="3ad132cb-532c-4ab9-b91f-6dc1f762abef" />
+</Solution>

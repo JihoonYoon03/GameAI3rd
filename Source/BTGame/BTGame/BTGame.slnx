@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="BTGame/BTGame.vcxproj" Id="9a627955-39d8-4c30-8225-8b336eddc1c5" />
+</Solution>
