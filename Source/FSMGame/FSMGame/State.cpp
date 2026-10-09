@@ -38,7 +38,12 @@ bool SELLING::OnMessage(CMerchant* owner, const Telegram& telegram)
     if (telegram.Msg != MSG_ITEM_STOLEN || telegram.Sender != Thief)
         return false;
 
-    // Stock was already transferred, even if the merchant does not notice it.
+    if (owner->GetSellingItems() <= 0)
+        return true;
+
+    owner->ItemStolen();
+    owner->MsgSend(Thief, MSG_ITEM_GET);
+
     if (owner->GetSellingItems() > 0 && Chance(GameConfig::NoticeTheftPercent))
         owner->GetFSM().ChangeState(CALLING_GUARD::Instance());
     return true;
@@ -53,7 +58,7 @@ CALLING_GUARD* CALLING_GUARD::Instance()
 void CALLING_GUARD::Enter(CMerchant* owner)
 {
     owner->ResetStateTicks();
-    owner->SendMessage(Guard, MSG_THIEF_SPOTTED);
+    owner->MsgSend(Guard, MSG_THIEF_SPOTTED);
 }
 
 void CALLING_GUARD::Exit(CMerchant*)
@@ -128,7 +133,11 @@ void WANDERING::Execute(CThief* owner)
     if (owner->AdvanceStateTicks() >= GameConfig::WanderTicks)
         owner->GetFSM().ChangeState(STEALING::Instance());
 }
-bool WANDERING::OnMessage(CThief*, const Telegram&) { return false; }
+
+bool WANDERING::OnMessage(CThief*, const Telegram&)
+{ 
+    return false;
+}
 
 STEALING* STEALING::Instance()
 {
@@ -147,17 +156,20 @@ void STEALING::Exit(CThief*)
 
 void STEALING::Execute(CThief* owner)
 {
-    if (owner->StealOneItem())
-        std::cout << "µµµÏ: ¹°°Ç ÇÏ³ª¸¦ ÈÉÃÆ´Ù! (ÈÉÄ£ ¹°°Ç: " << owner->GetStolenItems() << "°³)\n";
-    else
-        std::cout << "µµµÏ: ´õ ÀÌ»ó ÈÉÄ¥ ¹°°ÇÀÌ ¾ø´Ù...\n";
-
-    owner->GetFSM().ChangeState(WANDERING::Instance());
+    // Stay in STEALING until the queued reply arrives.
+    owner->StealOneItem();
 }
 
-bool STEALING::OnMessage(CThief*, const Telegram&)
-{ 
-    return false; 
+bool STEALING::OnMessage(CThief* owner, const Telegram& telegram)
+{
+    if (telegram.Sender != Merchant || telegram.Msg != MSG_ITEM_GET)
+        return false;
+
+    owner->AddOneItem();
+    std::cout << "µµµÏ: ¹°°Ç ÇÏ³ª¸¦ ÈÉÃÆ´Ù! (ÈÉÄ£ ¹°°Ç: "
+        << owner->GetStolenItems() << "°³)\n";
+    owner->GetFSM().ChangeState(WANDERING::Instance());
+    return true;
 }
 
 ESCAPING* ESCAPING::Instance()
@@ -179,7 +191,11 @@ void ESCAPING::Execute(CThief*)
 {
     std::cout << "µµµÏ: °æºñº´À» ÇÇÇØ µµ¸ÁÄ¡´Â Áß...\n";
 }
-bool ESCAPING::OnMessage(CThief*, const Telegram&) { return false; }
+
+bool ESCAPING::OnMessage(CThief*, const Telegram&)
+{ 
+    return false;
+}
 
 THIEF_GLOBAL_STATE* THIEF_GLOBAL_STATE::Instance()
 {
@@ -204,6 +220,11 @@ bool THIEF_GLOBAL_STATE::OnMessage(CThief* owner, const Telegram& telegram)
     // A chase notification interrupts both wandering and stealing.
     if (telegram.Sender != Guard)
         return false;
+    if (telegram.Msg == MSG_THIEF_CAUGHT)
+    {
+        owner->SetCaught();
+        return true;
+    }
     if (telegram.Msg == MSG_GUARD_CHASING)
     {
         owner->GetFSM().ChangeState(ESCAPING::Instance());
@@ -258,7 +279,7 @@ CHASING* CHASING::Instance()
 void CHASING::Enter(CGuard* owner)
 {
     owner->ResetStateTicks();
-    owner->SendMessage(Thief, MSG_GUARD_CHASING);
+    owner->MsgSend(Thief, MSG_GUARD_CHASING);
 }
 
 void CHASING::Exit(CGuard*) 
@@ -313,9 +334,9 @@ void RETURNING::Execute(CGuard* owner)
     {
         std::cout << "°æºñº´: º¹±Í ¿Ï·á. ´Ù½Ã ¼øÂûÀ» ½ÃÀÛÇÑ´Ù.\n";
         owner->GetFSM().ChangeState(PATROLLING::Instance());
-        owner->SendMessage(Thief, MSG_GUARD_RETURNING);
+        owner->MsgSend(Thief, MSG_GUARD_RETURNING);
         // Also release the merchant from WAITING when the guard resumes patrol.
-        owner->SendMessage(Merchant, MSG_GUARD_RETURNING);
+        owner->MsgSend(Merchant, MSG_GUARD_RETURNING);
     }
     else
     {

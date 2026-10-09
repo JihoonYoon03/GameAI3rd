@@ -26,7 +26,7 @@ CBaseEntity* MessageManager::GetEntity(int id) const
     return it == m_entities.end() ? nullptr : it->second;
 }
 
-bool MessageManager::DispatchMessage(int sender, int receiver, int message,
+bool MessageManager::MsgDispatch(int sender, int receiver, int message,
     double delaySeconds, void* extraInfo)
 {
     if (!GetEntity(sender) || !GetEntity(receiver))
