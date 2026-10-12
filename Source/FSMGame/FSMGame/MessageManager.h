@@ -12,7 +12,7 @@ public:
     CBaseEntity* GetEntity(int id) const;
 
     // Even zero-delay messages are queued, so Enter/Exit cannot be re-entered.
-    bool DispatchMessage(int sender, int receiver, int message,
+    bool MsgDispatch(int sender, int receiver, int message,
         double delaySeconds = 0.0, void* extraInfo = nullptr);
     void Update(double currentTimeSeconds);
     void DispatchPendingMessages();

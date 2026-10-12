@@ -52,8 +52,8 @@ int main()
 
     MessageManager messages;
     CMerchant merchant(Merchant, messages);
-    CThief thief(Thief, messages, merchant);
-    CGuard guard(Guard, messages, thief);
+    CThief thief(Thief, messages);
+    CGuard guard(Guard, messages);
     const std::array<CBaseEntity*, 3> entities = { &merchant, &thief, &guard };
     for (CBaseEntity* entity : entities)
     {
