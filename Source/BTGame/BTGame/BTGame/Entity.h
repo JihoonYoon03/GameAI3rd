@@ -22,6 +22,7 @@ class CMerchant : public CBaseEntity
 {
 public:
     explicit CMerchant(Blackboard& blackboard);
+    void ObserveTheft();
     int GetSellingItems() const { return m_blackboard.GetMerchantItems(); }
 
 private:

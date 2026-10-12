@@ -1,76 +1,84 @@
 #include "common.h"
 #include "BehaviorTree.h"
 
+NodeStatus CBehaviorNode::Tick(TickContext& context)
+{
+    m_active = true;
+    const NodeStatus result = Execute(context);
+    if (result != NodeStatus::Running)
+        Reset();
+    return result;
+}
+
+void CBehaviorNode::Reset()
+{
+    // 부모가 다시 Reset을 요청해도 이미 정리한 노드는 초기화하지 않는다.
+    if (!m_active)
+        return;
+    m_active = false;
+    OnReset();
+}
+
 void CComposite::AddChild(std::unique_ptr<CBehaviorNode> child)
 {
     m_children.push_back(std::move(child));
 }
 
-void CComposite::Reset()
+void CComposite::OnReset()
 {
     for (const auto& child : m_children)
         child->Reset();
 }
 
-NodeStatus CSelector::Tick(TickContext& context)
+NodeStatus CSelector::Execute(TickContext& context)
 {
-    for (std::size_t i = 0; i < m_children.size(); ++i)
+    for (const auto& child : m_children)
     {
-        const NodeStatus result = m_children[i]->Tick(context);
+        const NodeStatus result = child->Tick(context);
         if (result == NodeStatus::Failure)
-        {
-            m_children[i]->Reset();
             continue;
-        }
 
-        // 예: 도주 가지가 선택되면 배회/절도의 진행 상황을 버린다.
-        for (std::size_t other = 0; other < m_children.size(); ++other)
-        {
-            if (other != i)
-                m_children[other]->Reset();
-        }
-        if (result == NodeStatus::Success)
-            m_children[i]->Reset();
+        // 우선순위가 바뀌었을 때 이전에 진행 중이던 가지만 취소한다.
+        if (m_runningChild && m_runningChild != child.get())
+            m_runningChild->Reset();
+        m_runningChild = result == NodeStatus::Running ? child.get() : nullptr;
         return result;
     }
     return NodeStatus::Failure;
 }
 
-NodeStatus CSequence::Tick(TickContext& context)
+void CSelector::OnReset()
+{
+    if (m_runningChild)
+        m_runningChild->Reset();
+    m_runningChild = nullptr;
+}
+
+NodeStatus CSequence::Execute(TickContext& context)
 {
     while (m_currentChild < m_children.size())
     {
         const NodeStatus result = m_children[m_currentChild]->Tick(context);
-        if (result == NodeStatus::Running)
+        if (result != NodeStatus::Success)
             return result;
-        if (result == NodeStatus::Failure)
-        {
-            Reset();
-            return result;
-        }
         ++m_currentChild;
     }
-
-    Reset();
     return NodeStatus::Success;
 }
 
-void CSequence::Reset()
+void CSequence::OnReset()
 {
     m_currentChild = 0;
-    CComposite::Reset();
+    CComposite::OnReset();
 }
 
-NodeStatus CReactiveSequence::Tick(TickContext& context)
+NodeStatus CReactiveSequence::Execute(TickContext& context)
 {
     for (std::size_t i = 0; i < m_children.size(); ++i)
     {
         const NodeStatus result = m_children[i]->Tick(context);
         if (result == NodeStatus::Failure)
-        {
-            Reset();
             return result;
-        }
         if (result == NodeStatus::Running)
         {
             for (std::size_t later = i + 1; later < m_children.size(); ++later)
@@ -78,8 +86,6 @@ NodeStatus CReactiveSequence::Tick(TickContext& context)
             return result;
         }
     }
-
-    Reset();
     return NodeStatus::Success;
 }
 
@@ -88,7 +94,7 @@ CCondition::CCondition(std::function<bool()> predicate)
 {
 }
 
-NodeStatus CCondition::Tick(TickContext&)
+NodeStatus CCondition::Execute(TickContext&)
 {
     return m_predicate() ? NodeStatus::Success : NodeStatus::Failure;
 }
@@ -98,21 +104,23 @@ CAction::CAction(std::function<NodeStatus()> action, std::function<void()> onRes
 {
 }
 
-NodeStatus CAction::Tick(TickContext& context)
+NodeStatus CAction::Execute(TickContext& context)
 {
-    // Sequence에서 앞 행동이 끝나도 다음 행동/출력은 다음 Tick까지 기다린다.
+    // 한 인물은 기존과 같이 한 Tick에 행동을 한 번만 실행한다.
     if (context.actionExecuted)
         return NodeStatus::Running;
 
     context.actionExecuted = true;
-    const NodeStatus result = m_action();
-    if (result != NodeStatus::Running)
-        Reset();
-    return result;
+    m_hasExecuted = true;
+    return m_action();
 }
 
-void CAction::Reset()
+void CAction::OnReset()
 {
+    // 실행 기회를 기다리기만 한 행동에는 정리 콜백이 필요하지 않다.
+    if (!m_hasExecuted)
+        return;
+    m_hasExecuted = false;
     if (m_onReset)
         m_onReset();
 }

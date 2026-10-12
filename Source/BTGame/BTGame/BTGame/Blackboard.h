@@ -11,6 +11,9 @@ public:
     bool IsThiefCaught() const { return m_thiefCaught; }
     bool IsGuardRequested() const { return m_guardRequested; }
 
+    bool HasPendingTheft() const { return m_theftPending; }
+    void RequestGuard() { m_guardRequestPending = true; }
+
     bool StealOneItem();
     void CatchThief() { m_thiefCaught = true; }
     void CompleteGuardReturn() { m_guardReturnPending = true; }
@@ -24,5 +27,6 @@ private:
     // 도난을 발견한 시점부터 경비병의 복귀 완료까지 유지되는 도움 요청이다.
     bool m_guardRequested = false;
     bool m_theftPending = false;
+    bool m_guardRequestPending = false;
     bool m_guardReturnPending = false;
 };

@@ -11,7 +11,7 @@ namespace
     }
 
     bool Tick(unsigned int tickNumber, const std::array<CBaseEntity*, 3>& entities,
-        Blackboard& blackboard, const CMerchant& merchant, const CThief& thief)
+        Blackboard& blackboard, CMerchant& merchant, const CThief& thief)
     {
         std::cout << "\n[Tick " << tickNumber << "]\n";
 
@@ -25,6 +25,7 @@ namespace
 
         // Publish observations after all characters have acted this Tick.
         // Trees react to the updated shared information on the next Tick.
+        merchant.ObserveTheft();
         blackboard.CommitTick();
         std::cout << std::flush;
         return !IsGameOver(merchant, thief);

@@ -12,6 +12,17 @@ CMerchant::CMerchant(Blackboard& blackboard) : CBaseEntity(blackboard)
     BuildBehaviorTree();
 }
 
+void CMerchant::ObserveTheft()
+{
+    // 모든 인물의 행동 후 한 번만 판단하여 기존 확률 판정 시점을 유지한다.
+    if (!m_blackboard.HasPendingTheft() || GetSellingItems() <= 0
+        || m_blackboard.IsGuardRequested())
+        return;
+
+    if (std::rand() % 100 < GameConfig::NoticeTheftPercent)
+        m_blackboard.RequestGuard();
+}
+
 void CMerchant::BuildBehaviorTree()
 {
     // Selector
